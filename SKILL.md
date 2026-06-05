@@ -150,6 +150,17 @@ Ordem para montar do zero (parando antes de publicar):
    - **Destino:** URL final + UTMs no Rastreamento. ⚠️ O Google/Meta bloqueia **display ≠ destino** (DESTINATION_MISMATCH): se a URL redireciona, use a URL final real.
 4. **Parar antes de Publicar** → usuário revisa e publica. Status "Em processamento" = revisão da Meta (normal, minutos a ~1 dia).
 
+**Variante: Impulsionar post existente (Boost)**
+
+Quando o usuário quer promover uma publicação orgânica do feed:
+1. Acesse a publicação no Facebook/Instagram → botão **"Impulsionar publicação"**, ou
+2. No Gerenciador: Criar → selecione **"Usar publicação existente"** na etapa de anúncio (mais controle de público e budget).
+3. Configure público, budget diário e duração.
+4. **Diferença importante:** boost não tem pixel de conversão por padrão — se quiser rastrear ações além de cliques, crie o anúncio no Gerenciador apontando para a mesma publicação (opção 2 acima).
+5. Objetivo recomendado para boost: **Engajamento** (aumentar curtidas/comentários) ou **Tráfego** (levar ao site).
+
+> ⚠️ Boost via botão direto na publicação tem menos opções de público e não aparece no Gerenciador com detalhes completos — prefira o fluxo pelo Gerenciador quando precisar de controle ou integração com pixel.
+
 ---
 
 ## 10. Checklist pré-lançamento
