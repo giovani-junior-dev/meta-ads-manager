@@ -180,6 +180,28 @@ Ordem para montar do zero (parando antes de publicar):
 
 ---
 
+## 12. Click-to-WhatsApp (anúncio que abre conversa no WhatsApp)
+
+Formato muito usado no Brasil: o clique no anúncio abre o WhatsApp Business direto — sem landing page intermediária.
+
+**Quando usar:** serviços locais, vendas consultivas, agendamentos, qualquer negócio que fecha no chat.
+
+**Configuração no Gerenciador:**
+1. Campanha → objetivo **Leads** ou **Engajamento** (não use Tráfego — ele manda pro link, não pro WhatsApp).
+2. Nível do anúncio → **Destino**: selecione "WhatsApp" (não "Site").
+3. Vincule o **WhatsApp Business** à Página do Facebook (Business Settings → Contas do WhatsApp).
+4. **Mensagem pré-preenchida:** configure a mensagem inicial que o usuário vê ao abrir (ex.: "Olá, vim do anúncio do Instagram!"). Faça isso em "Mensagem inicial" no editor.
+5. **CTA:** "Enviar mensagem" ou "Falar no WhatsApp".
+
+**Rastreamento:** o Meta registra o evento `MessagingConversationStarted` como conversão — configure isso no AEM (§7) se quiser otimizar por esse evento.
+
+**Armadilhas:**
+- Número desvinculado da Página → erro silencioso; anúncio vai pro ar mas destino não abre.
+- WhatsApp pessoal (não Business) → Meta recusa a vinculação.
+- Objetivo errado (Tráfego) → link quebrado no destino.
+
+---
+
 ## Skills relacionadas
 
 - **marketing-expert** — copy, headlines e gatilhos mentais para os criativos.
