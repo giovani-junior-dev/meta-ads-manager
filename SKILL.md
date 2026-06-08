@@ -118,8 +118,11 @@ Esta é a parte que **trava mais** e quase não aparece em guias. Anúncio preci
 ## 7. Rastreamento (Pixel / CAPI / eventos)
 
 - **Meta Pixel + Conversions API (CAPI):** rode os dois (navegador + servidor) com **deduplicação** (mesmo `event_id`). CAPI server-side recupera conversões perdidas no pós-cookie. Pode rodar via **GTM server-side**.
-- **Pixel dedicado:** evite pixel órfão (fora do seu Business Manager). Crie um pixel próprio e migre client + CAPI para ele.
-- **Verificação de domínio:** verifique o domínio no Business Manager (meta-tag ou DNS TXT). ⚠️ Cuidado com a **zona DNS certa** se houver múltiplos domínios/subdomínios.
+- **⚠️ Test Event Code (armadilha que custa tempo):** na tag CAPI (GTM server) o campo **"Test Event Code" deve ficar VAZIO em produção**. Se ficar um código fixo (ex.: `TEST9853`), a CAPI manda **TODOS os eventos como "teste"** — eles caem na aba "Eventos de teste" e **nunca** contam como produção, fazendo a CAPI parecer morta. Caso real: ficou preenchido por 3 anos. Como detectar: no Events Manager, o evento mostra integração **só "Navegador"** (nunca "Navegador e servidor"). Correção: limpar o campo e republicar o container.
+- **Pixel dedicado:** evite pixel órfão (fora do seu Business Manager). Crie um pixel próprio e migre client + CAPI para ele. ⚠️ Migre **as duas pontas**: variável do Pixel no GTM **web** E a tag CAPI no GTM **server** — esquecer o server deixa a CAPI mandando pro pixel velho.
+- **Validar tracking:** Events Manager → o evento bom mostra **"Navegador e servidor"** com dedup. Só "Navegador" = CAPI não está alimentando aquele pixel (ver os 2 itens acima).
+- **Verificação de domínio:** verifique o domínio no Business Manager (meta-tag ou DNS TXT). ⚠️ Cuidado com a **zona DNS certa** se houver múltiplos domínios/subdomínios. **Não confunda** com a **lista de permissão (allowlist) do pixel** (Events Manager → dataset → Permissões de tráfego): são controles diferentes de nome parecido. O alerta "Confirme os domínios que pertencem a você" no Diagnóstico é a allowlist (confirmar que o domínio pode mandar eventos), **não** a verificação de domínio — por isso continua pendente mesmo com o domínio já verificado.
+- **Correspondência avançada automática:** ative (Configurações → "Correspondência automática de site") — usa email/telefone com hash dos formulários para casar mais conversões com contas Meta (melhora atribuição e remarketing).
 - **AEM (Aggregated Event Measurement):** priorize até 8 eventos por domínio (Lead no topo) — necessário pós-iOS14 para medir usuários de iPhone.
 - **UTMs:** no editor novo, os parâmetros de URL ficam em **"Rastreamento" → Parâmetros de URL** (não anexe na URL de destino). Ex.: `utm_source=meta&utm_medium=cpc&utm_campaign=trafego_fase1`.
 
@@ -188,6 +191,8 @@ Quando o usuário quer promover uma publicação orgânica do feed:
 - **Pixel órfão** → crie um dedicado no seu BM.
 - **Aprimoramentos IA ligados por padrão** → reescrevem texto/arte; desligue se quer controle.
 - **Renderer do editor trava** com scroll pesado → recarregue a página para destravar.
+- **CAPI "morta" (só Navegador)** → quase sempre é **Test Event Code preenchido** na tag CAPI (§7) ou a tag server apontando pro pixel antigo. Não é o tráfego.
+- **"Confirme os domínios" não some** mesmo com domínio verificado → é a **allowlist do pixel**, não a verificação de domínio (§7).
 
 ---
 
