@@ -6,6 +6,7 @@ metadata:
   sources:
     - kostja94/marketing-skills meta-ads v1.1.1 (base conceitual)
     - Operação real MegaAPI — campanha Tráfego do zero (fluxo + armadilhas)
+    - Operação real MegaAPI — Click-to-WhatsApp Fase 2 + fix CAPI server-side + criativo animado (2026-06)
 ---
 
 # Meta Ads Manager (2026)
@@ -89,7 +90,15 @@ Forneça **assets diversos** (vários formatos/ângulos) — o algoritmo perform
 3. Subtexto legível: faixa escura (scrim) atrás do texto sobre imagens "ocupadas".
 4. No editor, **desligar todos os aprimoramentos de IA** (Aprimorar texto da mídia, Adicionar música, sobreposições, retoques) para manter controle de marca — a IA reescreve/altera sua arte e copy.
 
-> ⚠️ **Upload de arquivo local não é automatizável** pelas ferramentas de browser atuais — o upload dos criativos é feito **pelo usuário** (botão "+ Carregar" na aba Mídia). Forneça os caminhos dos arquivos e os formatos.
+> ⚠️ **Upload de arquivo local não é automatizável** pelas ferramentas de browser atuais — o upload dos criativos é feito **pelo usuário** (botão "+ Carregar" na aba Mídia / "Alterar seleções"). Forneça os caminhos e os formatos. A tool `file_upload` do browser **rejeita paths do host** ("no longer accepts host filesystem paths") — confirmado, é sempre manual.
+
+**Animar criativo estático (imagem → vídeo) sem deformar texto (real, MegaAPI):**
+i2v (image-to-video) **deforma texto/logo**. Solução = animar a **base limpa** (sem texto) e sobrepor o texto estático depois:
+1. **Replicate `wan-video/wan-2.2-i2v-fast`** (o mais barato/rápido, ~centavos/5s) anima a base `_creatives_*` (sem overlay). Input: `image`(URL via Files API), `prompt` conservador ("subtle ambient motion… stays steady and readable, no text"), `num_frames`=81, `resolution`=720p, `interpolate_output`=true (→30fps). Mantém o aspect da imagem (1:1→960², 2:3→retrato).
+2. **Pillow** gera a camada de texto **transparente** (RGBA: scrims + logo + headline + CTA) no tamanho da base.
+3. **ffmpeg** compõe: `scale=W:H:flags=lanczos[bg];[bg][1:v]overlay=0:0,format=yuv420p` → libx264 crf18. Resultado: fundo animado + texto 100% nítido.
+- Token Replicate antigo pode expirar (401) — validar com `GET /v1/account` antes. Usar stdlib `urllib` (sem libs externas) se o env Python estiver quebrado.
+- Vídeo resolve o alerta Meta "posicionamento exige vídeo" (ex.: Audience Network vídeo-incentivo) que a imagem não cobre.
 
 ---
 
@@ -121,6 +130,16 @@ Esta é a parte que **trava mais** e quase não aparece em guias. Anúncio preci
 - **⚠️ Test Event Code (armadilha que custa tempo):** na tag CAPI (GTM server) o campo **"Test Event Code" deve ficar VAZIO em produção**. Se ficar um código fixo (ex.: `TEST9853`), a CAPI manda **TODOS os eventos como "teste"** — eles caem na aba "Eventos de teste" e **nunca** contam como produção, fazendo a CAPI parecer morta. Caso real: ficou preenchido por 3 anos. Como detectar: no Events Manager, o evento mostra integração **só "Navegador"** (nunca "Navegador e servidor"). Correção: limpar o campo e republicar o container.
 - **Pixel dedicado:** evite pixel órfão (fora do seu Business Manager). Crie um pixel próprio e migre client + CAPI para ele. ⚠️ Migre **as duas pontas**: variável do Pixel no GTM **web** E a tag CAPI no GTM **server** — esquecer o server deixa a CAPI mandando pro pixel velho.
 - **Validar tracking:** Events Manager → o evento bom mostra **"Navegador e servidor"** com dedup. Só "Navegador" = CAPI não está alimentando aquele pixel (ver os 2 itens acima).
+- **⚠️ Token CAPI inválido pro pixel (causa #1 de "só Navegador" depois de trocar pixel):** ao migrar pro pixel novo, **regenere o token de acesso no pixel novo** e atualize a variável do token no GTM server. Token velho (do pixel antigo) → Meta **rejeita em silêncio** (o Diagnóstico **não acusa** porque nada server-side completa). Caso real: trocaram o pixel mas o `{{Facebook Token}}` continuou inválido → CAPI morta por dias. Fix: Events Manager → dataset → Configurações → **"API de Conversões" → "Configurar sem a Dataset Quality API" → "Gerar token de acesso"** → colar na variável do token no server container → **publicar nova versão**.
+
+**Playbook de diagnóstico CAPI server-side (GTM Preview / Tag Assistant):**
+A cadeia é: `form submit → evento dataLayer (ex. sign_up) → tag web "GA4 event" (transport_url=server) → server container recebe → trigger → Conversions API Tag → Meta`. Para achar onde quebra:
+1. **GTM web** container → botão **"Visualizar"** → Tag Assistant → conectar à URL onde o evento dispara (ex. o register). Gerar 1 conversão real.
+2. No Tag Assistant, abrir o evento e a tag CAPI-web: confirmar que **disparou/concluiu**, ver em **"Valores"** (não "Nomes") o `transport_url` (= URL do server) e o `event_id`. "Hits enviados → G-XXXX" = mandou pro server com aquele measurement.
+3. **GTM server** container → "Visualizar" também → repetir 1 conversão → ver se a Conversions API Tag dispara e a **resposta do Meta** (erro de token aparece aqui).
+4. Checklist server: variável do **Pixel** = pixel certo? variável do **Token** corresponde a esse pixel? **Test Event Code** vazio? **trigger** aciona (RegEx `.+` aciona qualquer evento)?
+- ⚠️ **GTM server Preview é frágil:** a aba `…/gtm/debug` fecha sozinha e o **link direto expira** — sempre religar pelo botão **"Visualizar"** do container, não pela URL. Renderer do GTM trava muito; usar `get_page_text` quando o screenshot falhar.
+- **GTM tem 2 containers:** **web** (GTM-xxxx, tags Pixel/GA4/CAPI-web que mandam pro server) e **server** (Conversions API Tag → Meta). Confirme o login Google certo (authuser) — o container pode estar em outra conta Google que não a logada.
 - **Verificação de domínio:** verifique o domínio no Business Manager (meta-tag ou DNS TXT). ⚠️ Cuidado com a **zona DNS certa** se houver múltiplos domínios/subdomínios. **Não confunda** com a **lista de permissão (allowlist) do pixel** (Events Manager → dataset → Permissões de tráfego): são controles diferentes de nome parecido. O alerta "Confirme os domínios que pertencem a você" no Diagnóstico é a allowlist (confirmar que o domínio pode mandar eventos), **não** a verificação de domínio — por isso continua pendente mesmo com o domínio já verificado.
 - **Correspondência avançada automática:** ative (Configurações → "Correspondência automática de site") — usa email/telefone com hash dos formulários para casar mais conversões com contas Meta (melhora atribuição e remarketing).
 - **AEM (Aggregated Event Measurement):** priorize até 8 eventos por domínio (Lead no topo) — necessário pós-iOS14 para medir usuários de iPhone.
@@ -135,6 +154,8 @@ Esta é a parte que **trava mais** e quase não aparece em guias. Anúncio preci
 - **Frequência:** mantenha **< 3** para evitar fadiga.
 - **Refresh de criativo:** fadiga criativa é a principal alavanca — planeje teste contínuo e **troque quando a performance cair**.
 - **Fase 1 enxuta:** R$10–20/dia para tráfego é suficiente para começar a juntar sinal sem queimar budget.
+- **Onde ver o gasto:** Gerenciador de Anúncios → coluna **"Valor usado"** (por campanha/conjunto, filtra período) · **Visão geral da conta** ("Valor gasto últimos 7 dias", conta inteira) · **Cobrança e pagamentos** (fatura real). Meta e Google Ads têm faturas **separadas**.
+- **Travar teto:** Configurações da conta → **"Limite de gasto da conta"** — máximo absoluto; a Meta para de veicular ao atingir. Recomende setar para não escapar do orçamento.
 
 ---
 
@@ -147,7 +168,7 @@ Ordem para montar do zero (parando antes de publicar):
 3. **Anúncio:**
    - **Identidade:** Página + Instagram (resolva §6 ANTES — senão trava no publish).
    - **Formato:** "Imagem ou vídeo único" (single) ou flexível; "Anúncios com vários anunciantes" ok.
-   - **Mídia:** usuário sobe os criativos; você seleciona e usa **Corte → Substituir** para arte dedicada de Stories (2:3).
+   - **Mídia:** usuário sobe os criativos (manual); você seleciona. "Personalizar mídia → Cortar" **só enquadra** (não troca arquivo) — para arte/vídeo dedicado de Stories (2:3) selecione as **duas mídias na criação** (§11).
    - **Texto:** até 5 textos principais, 2 títulos, descrição; **CTA** (ex.: "Saiba mais"). Use JS para setar campos com **acentos** corretos (digitação direta às vezes perde acentuação; anúncio público exige ortografia correta).
    - **Aprimoramentos IA:** todos **OFF**.
    - **Destino:** URL final + UTMs no Rastreamento. ⚠️ O Google/Meta bloqueia **display ≠ destino** (DESTINATION_MISMATCH): se a URL redireciona, use a URL final real.
@@ -191,8 +212,13 @@ Quando o usuário quer promover uma publicação orgânica do feed:
 - **Pixel órfão** → crie um dedicado no seu BM.
 - **Aprimoramentos IA ligados por padrão** → reescrevem texto/arte; desligue se quer controle.
 - **Renderer do editor trava** com scroll pesado → recarregue a página para destravar.
-- **CAPI "morta" (só Navegador)** → quase sempre é **Test Event Code preenchido** na tag CAPI (§7) ou a tag server apontando pro pixel antigo. Não é o tráfego.
+- **CAPI "morta" (só Navegador)** → ordem de suspeita: **(1) token inválido pro pixel** após troca de pixel · (2) **Test Event Code preenchido** na tag CAPI · (3) tag server apontando pro pixel antigo (§7). Não é o tráfego. Confirme com GTM Preview.
 - **"Confirme os domínios" não some** mesmo com domínio verificado → é a **allowlist do pixel**, não a verificação de domínio (§7).
+- **Texto principal "some" no editor** → ao reabrir o anúncio, o campo Texto principal aparece **vazio mesmo já salvo** (Título/Descrição persistem). **Sempre re-verificar e repreencher via JS antes de Publicar**, senão publica sem texto principal.
+- **Aprimoramentos IA religam sozinhos** → "Adicionar detalhes", "Revelar detalhes com o tempo", "Retoques/Animação" voltam a cada interação/wizard. Não vale lutar com todos — desligue os **destrutivos de copy** (Gerar CTA, Melhorias/Aprimorar texto) e aceite os benignos de exibição.
+- **Seletor de mídia bagunça a seleção** → na biblioteca ("Alterar seleções"), clicar nos thumbs toggla de forma imprevisível (add quando esperava remover). Se a contagem desandar: **Cancelar e reabrir** o seletor (volta ao estado salvo = só a mídia atual) e refazer a seleção limpa. Vídeos ficam na aba **"Vídeos"** (não "Imagens").
+- **"Personalizar mídia" só CROPA** → não troca o arquivo por posicionamento, só enquadra a mesma mídia (Quadrado/Vertical/Horizontal → Original ou Cortar). Cortar vertical num 1:1 **corta logo/CTA**. Para vídeo vertical dedicado no Stories: **selecionar as duas mídias (feed + stories) na criação** e deixar a Meta atribuir — não dá pra "substituir" nesse painel.
+- **Editar campanha ativa reseta aprendizado** (mudança de público/criativo). Em anúncio recém-publicado o custo é baixo; evite mexer repetido.
 
 ---
 
@@ -203,18 +229,26 @@ Formato muito usado no Brasil: o clique no anúncio abre o WhatsApp Business dir
 **Quando usar:** serviços locais, vendas consultivas, agendamentos, qualquer negócio que fecha no chat.
 
 **Configuração no Gerenciador:**
-1. Campanha → objetivo **Leads** ou **Engajamento** (não use Tráfego — ele manda pro link, não pro WhatsApp).
-2. Nível do anúncio → **Destino**: selecione "WhatsApp" (não "Site").
+1. Campanha → objetivo **Engajamento** (ou Leads) com "Destinos das mensagens" → WhatsApp. **Não use Tráfego** (manda pro link, não pro WhatsApp).
+2. Conjunto → **Destino manual** = o número WhatsApp Business; "Maximizar conversas".
 3. Vincule o **WhatsApp Business** à Página do Facebook (Business Settings → Contas do WhatsApp).
-4. **Mensagem pré-preenchida:** configure a mensagem inicial que o usuário vê ao abrir (ex.: "Olá, vim do anúncio do Instagram!"). Faça isso em "Mensagem inicial" no editor.
-5. **CTA:** "Enviar mensagem" ou "Falar no WhatsApp".
+4. **Configurador de conversa** (botão "Editar" na seção Conversas) = **2 campos**: **Mensagem de boas-vindas** (saudação automática que a empresa envia) + **Mensagem pronta** (o que o cliente envia ao abrir, ≤80 chars). Setar via JS (acentos).
+5. **CTA:** "Enviar mensagem pelo WhatsApp".
+6. **Autenticar o número (passo do usuário, pós-publish):** o número entra como "Precisa de autenticação"; depois de publicar, o Facebook manda um **código** pra autenticar no app **WhatsApp Business**. Sem isso, o anúncio roda mas a conversa não abre.
 
 **Rastreamento:** o Meta registra o evento `MessagingConversationStarted` como conversão — configure isso no AEM (§7) se quiser otimizar por esse evento.
 
+**⚠️ Qualidade do lead (lição real):**
+- **Engajamento + "Maximizar conversas" atrai LIXO** — otimiza por volume de chat, traz curioso (não comprador). Esperar mais **não conserta**; o algoritmo só fica melhor em trazer "conversador". É estrutural, não fase de aprendizado.
+- **Esse objetivo + Advantage+ NÃO expõe segmentação por interesses** — público forçado "amplo" (só dá pra mexer em posicionamento e slider Limitado↔Amplo). Segmentação real por interesse só **recriando a campanha** com público controlado.
+- **Saudação qualificadora** (filtro grátis, não reseta nada): faça a mensagem de boas-vindas perguntar o fit — ex. *"Você é desenvolvedor, agência ou tem um negócio querendo automatizar o WhatsApp?"*. Quem não tem fit não responde.
+- **Médio prazo:** com a **CAPI saudável** (Lead server-side), migrar de Engajamento → **Conversões/Leads** otimizando por cadastro real → traz cliente, não curioso. A CAPI é pré-requisito dessa evolução.
+
 **Armadilhas:**
-- Número desvinculado da Página → erro silencioso; anúncio vai pro ar mas destino não abre.
+- Número desvinculado da Página / **não autenticado** → erro silencioso; anúncio vai pro ar mas destino não abre.
 - WhatsApp pessoal (não Business) → Meta recusa a vinculação.
 - Objetivo errado (Tráfego) → link quebrado no destino.
+- Vídeo 1:1 no Stories/Status do WhatsApp → roda com letterbox (1:1 é aceito); 2:3 **não** está na lista de proporções do Status (9:16, 1.91:1, 16:9, 1:1, 4:5).
 
 ---
 
